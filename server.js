@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 3000;
 
 // ─── Actividad "Filtrar / Setter / Cerrar" — datos en memoria ────────────────
 const classifySubmissions = []; // { name, classifications: {concepto: 'filtrar'|'setter'|'cerrar'}, ts }
+const classifyFinals = {}; // { concepto: 'filtrar'|'setter'|'cerrar' } — decisión oficial de Carlos
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -119,7 +120,21 @@ const server = http.createServer((req, res) => {
     });
 
   } else if (req.method === 'GET' && req.url === '/api/classify/results') {
-    sendJSON(res, 200, { submissions: classifySubmissions });
+    sendJSON(res, 200, { submissions: classifySubmissions, finals: classifyFinals });
+
+  } else if (req.method === 'POST' && req.url === '/api/classify/final') {
+    readBody(req).then(body => {
+      try {
+        const { concept, bucket } = JSON.parse(body || '{}');
+        if (!concept || !['filtrar','setter','cerrar'].includes(bucket)) {
+          return sendJSON(res, 400, { error: 'Falta concept o bucket inválido' });
+        }
+        classifyFinals[concept] = bucket;
+        sendJSON(res, 200, { ok: true });
+      } catch (e) {
+        sendJSON(res, 400, { error: 'Invalid JSON' });
+      }
+    });
 
   } else if (req.method === 'GET' && req.url === '/api/classify/export.csv') {
     const rows = [['nombre', 'concepto', 'clasificacion', 'fecha']];
@@ -128,6 +143,11 @@ const server = http.createServer((req, res) => {
       Object.entries(s.classifications).forEach(([concept, bucket]) => {
         rows.push([s.name, concept, bucket, date]);
       });
+    });
+    rows.push(['', '', '', '']);
+    rows.push(['CLASIFICACIÓN FINAL', '', '', '']);
+    Object.entries(classifyFinals).forEach(([concept, bucket]) => {
+      rows.push(['Carlos (final)', concept, bucket, '']);
     });
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     res.writeHead(200, {
@@ -138,6 +158,7 @@ const server = http.createServer((req, res) => {
 
   } else if (req.method === 'POST' && req.url === '/api/classify/reset') {
     classifySubmissions.length = 0;
+    Object.keys(classifyFinals).forEach(k => delete classifyFinals[k]);
     sendJSON(res, 200, { ok: true });
 
   } else if (req.url === '/health') {
