@@ -54,6 +54,8 @@ const server = http.createServer((req, res) => {
         const data = JSON.stringify({
           model: 'gpt-4o-mini',
           max_tokens: payload.max_tokens || 400,
+          // temperature: 0 = califica igual cada vez (exámenes); si no la mandan, 0.7 como antes (simulador)
+          temperature: typeof payload.temperature === 'number' ? Math.max(0, Math.min(1, payload.temperature)) : 0.7,
           messages: messages
         });
 
